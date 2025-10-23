@@ -26,7 +26,7 @@ let map = L.map('map', {
     scrollWheelZoom: false,
     doubleClickZoom: false,
     boxZoom: false,
-    touchZoom: false
+    touchZoom: false,
 }).setView([LAT_POLYTECH, LNG_POLYTECH], 6); // Zoom initial
 
 // Tuile OpenStreetMap /!\ à usage policy
@@ -37,9 +37,9 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 }).addTo(map);
 
 
-
 map.getContainer().addEventListener('touchstart', (e) => {
     if(e.touches.length == 1){
+        //map.dragging.enable();
         fingerDown = true;
         const touch = e.touches[0];
         const latlng = map.containerPointToLatLng([touch.clientX, touch.clientY]);
@@ -47,25 +47,51 @@ map.getContainer().addEventListener('touchstart', (e) => {
         currentLon = latlng.lng;
     }
     else if(e.touches.length >= 2){
+        //map.dragging.enable();
         fingerDown = false;
     }
 });
 
+let lastMidpoint = null;
+let isPanning = false; // être sûr qu'on a commencé à bouger
 map.getContainer().addEventListener('touchmove', async (e) => {
     //console.log('cc');
+    //console.log(map.dragging)
+    
     if(e.touches.length == 1){
+        //map.dragging.enable();
         fingerDown = true;
         const touch = e.touches[0];
         const latlng = map.containerPointToLatLng([touch.clientX, touch.clientY]);
         currentLat = latlng.lat;
         currentLon = latlng.lng;
+
+        lastMidPoint = null;
+        isPanning = false;
     
     }
     else if (e.touches.length >= 2){
+        //map.dragging.enable();
         fingerDown = false;
-        // Deux doigts : pan fluide
+        // Deux doigts : pan fluide manuellement
 
-    }
+        const x = (e.touches[0].clientX + e.touches[1].clientX) / 2;
+        const y = (e.touches[0].clientY + e.touches[1].clientY) / 2;
+        const midpoint = L.point(x, y);
+
+        if (lastMidpoint && isPanning) {
+            const dx = midpoint.x - lastMidpoint.x;
+            const dy = midpoint.y - lastMidpoint.y;
+            map.panBy([ -dx, -dy ], { animate: false });
+        }
+        else{
+            isPanning = true;
+        }
+
+
+        lastMidpoint = midpoint;
+
+        }
 
 
     // handlePosition(latlng.lat, latlng.lng);
@@ -83,9 +109,9 @@ async function handlePosition(lat, lon) {
     lastCheckTime = now;
 
     const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json`);
-    console.log(res);
+    //console.log(res);
     const data = await res.json();
-    console.log(data);
+    //console.log(data);
     try {
         const country = data.address.country;
 
@@ -101,7 +127,9 @@ async function handlePosition(lat, lon) {
         speak(`${subdivision}`);
     }
     } catch (error) {
-        console.log('coucou');
+        console.log('plouf dans l\'eau :)');
+        speak(`PLOUF dans l'eau`);
+
         //const marineRes = await fetch(`https://www.marineregions.org/rest/getGazetteerRecordsByLatLong.json?lat=${lat}&lon=${lon}`);
         // océan ou mer
     }
@@ -111,6 +139,7 @@ async function handlePosition(lat, lon) {
 function speak(text) {
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = 'fr-FR'; // ou 'en-US' si tu veux en anglais
-    speechSynthesis.cancel(); // stop toute parole en cours
+    utterance.rate = 1.8; // 1.0 : normal
+    speechSynthesis.cancel(); // stop toute parole en cours, peut-être faire un queue ???
     speechSynthesis.speak(utterance);
 }
